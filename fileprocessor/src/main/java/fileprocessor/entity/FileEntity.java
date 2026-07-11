@@ -14,8 +14,7 @@ public class FileEntity {
     private String filename;
     private String filetype;
     private Long filesize;
-
-    private LocalDateTime uploadTime = LocalDateTime.now();
+    private LocalDateTime uploadTime;
 
     public Long getId() {
         return id;
@@ -24,32 +23,30 @@ public class FileEntity {
     public String getFilename() {
         return filename;
     }
-
     public void setFilename(String filename) {
-        this.filename = filename;
-    }
+    this.filename = filename;
+}
 
-    public String getFiletype() {
-        return filetype;
-    }
+public void setFiletype(String filetype) {
+    this.filetype = filetype;
+}
 
-    public void setFiletype(String filetype) {
-        this.filetype = filetype;
-    }
+public void setFilesize(Long filesize) {
+    this.filesize = filesize;
+}
 
-    public Long getFilesize() {
-        return filesize;
-    }
+public void setUploadTime(LocalDateTime uploadTime) {
+    this.uploadTime = uploadTime;
+}
+public String getFiletype() {
+    return filetype;
+}
 
-    public void setFilesize(Long filesize) {
-        this.filesize = filesize;
-    }
+public Long getFilesize() {
+    return filesize;
+}
 
-    public LocalDateTime getUploadTime() {
-        return uploadTime;
-    }
-
-    public void setUploadTime(LocalDateTime uploadTime) {
-        this.uploadTime = uploadTime;
-    }
+public LocalDateTime getUploadTime() {
+    return uploadTime;
+}
 }
