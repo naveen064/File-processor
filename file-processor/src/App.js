@@ -1,144 +1,267 @@
-import{useState} from"react";
+import { useState, useEffect } from "react";
 import Login from "./Login";
 import axios from "axios";
 import "./App.css";
+
 function App() {
-  const [loggedIn, setLoggedIn] = useState(false);   
-
-  const [file, setFile] = useState(null);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [files, setFiles] = useState([]);
   const [message, setMessage] = useState("");
+  const [search,setSearch] = useState("");
+  const [progress, setProgress] = useState(0);
+  const role = localStorage.getItem("role");
 
-  const handleUpload = () => {
-    if(!file){
-      setMessage("Please select a file first.");
-      return;
-    }
-    const allowedType = [
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-];
-    if(!allowedType.includes(file.type)){
-      setMessage("Only PDF,DOCX and PPTX files are allowed!");
-      return;
-    }
-    axios.post("http://localhost:8080/api/files", {
-    filename: file.name,
-    filetype: file.type,
-    filesize: file.size
-})
-.then(() => {
-    setMessage("File uploaded successfully!");
-}).catch((error) => {
-    console.log(error);
-    console.log(error.response);
-    setMessage("Upload failed!");
-});
+  const allowedType = [
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+  ];
+   const fetchFiles = async () => {
+  try {
+    const response = await axios.get("http://localhost:8080/api/files");
+    setFiles(response.data);
+  } catch (err) {
+    console.log(err);
   }
-  const handleView =()=>{
-    const fileURL = URL.createObjectURL(file);
-    window.open(fileURL,"_blank");
-  };
-  const handleDownload=()=>{
-    const fileURL=URL.createObjectURL(file);
-    const link=document.createElement("a");
-    link.href=fileURL;
-    link.download=file.name;
-    link.click();
-  };
-  const handleDelete = () => {
-    setFile(null);
-    setMessage("File deleted successfully!");
 };
-if(!loggedIn){
-  return<Login onLogin={()=>
-    setLoggedIn(true)}/>
+useEffect(() => {
+  fetchFiles();
+}, []);
+if (!loggedIn) {
+    return <Login onLogin={() => setLoggedIn(true)} />;
   }
-  return(
-  <div className="dashboard">
-    <div className="sidebar">
-    <h2>📁 File Processor</h2>
-    <ul>
-      <li>🏠 Dashboard</li>
-      <li>📤 Upload Document</li>
-      <li>📂 My Files</li>
-      <li>🕒 Recent Files</li>
-      <li>⭐ Favorites</li>
-      <li>🗑️ Trash</li>
-      <li>⚙️ Settings</li>
-    </ul>
+  const handleLogout = () => {
+    setLoggedIn(false);
+    setFiles([]);
+    setMessage("");
+    setSearch("");
+};
+
+  const handleUpload = async () => {
+    if (files.length === 0) {
+      setMessage("Please select file(s).");
+      return;
+    }
+
+    const valid = files.every((f) => allowedType.includes(f.type));
+
+    if (!valid) {
+      setMessage("Only PDF, DOCX and PPTX files are allowed!");
+      return;
+    }
+
+    try {
+    for (const file of files) {
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        await axios.post(
+            "http://localhost:8080/api/files/upload",
+            formData,
+            {
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+                onUploadProgress: (progressEvent) => {
+                    const percent = Math.round(
+                        (progressEvent.loaded * 100) /
+                        progressEvent.total
+                    );
+
+                    setProgress(percent);
+                },
+            }
+        );
+    }
+
+
+    await fetchFiles();
+    setMessage("Files uploaded successfully!");
+
+    setProgress(100);
+
+    setTimeout(() => {
+        setProgress(0);
+    }, 1500);
+
+} catch (err) {
+    console.log(err);
+    setMessage("Upload failed!");
+}
+  };
+
+  const handleView = (file) => {
+  window.open(
+    `http://localhost:8080/api/files/view/${file.filename}`,
+    "_blank"
+  );
+};
+  const handleDownload = (file) => {
+  window.open(
+    `http://localhost:8080/api/files/download/${file.filename}`,
+    "_blank"
+  );
+};
+
+
+  const handleDelete = async (id) => {
+    try {
+        await axios.delete(`http://localhost:8080/api/files/delete/${id}`);
+        fetchFiles();
+        setMessage("File deleted successfully!");
+    } catch (err) {
+        console.log(err);
+        setMessage("Delete failed!");
+    }
+};
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setFiles(Array.from(e.dataTransfer.files));
+  };
+ const handleSearch = async () => {
+  try {
+    const response = await axios.get(
+  `http://localhost:8080/api/files/search?filename=${search}`
+);
+
+    setFiles(response.data);
+  } catch (err) {
+    console.log(err);
+    setMessage("Search failed!");
+  }
+};
+  return (
+    <div className="dashboard">
+      <div className="sidebar">
+        <h2>📁 File Processor</h2>
+      </div>
+
+      <div className="main-container">
+
+        <div
+          className="drop-zone"
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+        >
+
+          <div className="upload-icon">☁️</div>
+
+          <h3>Drag & Drop your file here</h3>
+
+          <p>or</p>
+
+          <input
+            id="fileInput"
+            type="file"
+            multiple
+            hidden
+            onChange={(e) => setFiles(Array.from(e.target.files))}
+          />
+
+          <label htmlFor="fileInput" className="choose-btn">
+            Choose Files
+          </label>
+
+          {files.length > 0 && (
+            <div className="selected-file">
+              <strong>{files.length} file(s) selected</strong>
+            </div>
+          )}
+        </div>
+
+        <br />
+
+        <button className="upload-btn" onClick={handleUpload}>
+    Upload File
+</button>
+{progress > 0 && (
+  <div className="progress-container">
+    <div
+      className="progress-bar"
+      style={{ width: `${progress}%`}}
+    >
+      {progress}%
     </div>
-<div className="main-container">
- <div className="upload-card">
-  <div className="drop-zone" >
-  
-<h3>Drag & Drop your file here</h3>
-<p>or</p>
+  </div>
+)}
+<button className="logout-btn" onClick={handleLogout}>
+    Logout
+</button>
 
-      <input
-      id="fileInput"
-        type="file"
-        hidden
-        onChange={(e) =>
-           setFile(e.target.files[0])}
-      />
-      <label htmlFor="fileInput"
-      className="choose-btn">
-        choose File
-      </label>
+<br /><br />
 
-      <br /><br />
+<input
+  type="text"
+  placeholder="Search file..."
+  value={search}
+  onChange={(e) => setSearch(e.target.value)}
+/>
 
-    </div>
+<button onClick={handleSearch}>
+  Search
+</button>
 
-    <br />
+<p>{message}</p>
 
-    <button className="upload-btn" onClick={handleUpload}>
-      Upload File
+        <h2>📁 Uploaded Files</h2>
+
+        <table>
+          <thead>
+  <tr>
+    <th>S.No</th>
+    <th>File Name</th>
+    <th>File Size</th>
+    <th>Upload Date & Time</th>
+    <th>Status</th>
+    <th>Action</th>
+  </tr>
+</thead>
+
+          <tbody>
+            {files.map((file, index) => (
+              <tr key={index}>
+  <td>{index + 1}</td>
+
+  <td>{file.filename}</td>
+
+  <td>
+  {file.filesize ? (file.filesize / 1024).toFixed(2) + " KB" : "-"}
+</td>
+
+ <td>
+  {file.uploadTime ? new Date(file.uploadTime).toLocaleString() : "-"}
+</td>
+
+  <td>Uploaded</td>
+
+  <td>
+    <button onClick={() => handleView(file)}>View</button>
+
+    <button onClick={() => handleDownload(file)}>
+      Download
     </button>
-    <p>{message}</p>
-    <br /><br />
- <h2>📁 Uploaded Files</h2>
- <input
- type="text"
- placeholder="Search files..."
- className="search-box"
- />
-    <table>
-      <thead>
-        <tr>
-          <th>File Name</th>
-          <th>Status</th>
-          <th>Action</th>
-        </tr>
-      </thead>
+    {role === "ADMIN" && (
+    <button onClick={() => handleDelete(file.id)}>
+        Delete
+    </button>
+)}
+    
+  </td>
+</tr>
+            ))}
+          </tbody>
 
-      <tbody>
-        {file && (
-          <tr>
-            <td>{file.name}</td>
-            <td>Uploaded</td>
+        </table>
 
-            <td>
-              <button className="view-btn" onClick={handleView}>
-                View
-              </button>
-
-              <button className="download-btn" onClick={handleDownload}>
-                Download
-              </button>
-
-              <button className="delete-btn" onClick={handleDelete}>
-                Delete
-              </button>
-            </td>
-          </tr>
-        )}
-      </tbody>
-    </table>
-    </div>
-    </div>
+      </div>
     </div>
   );
 }
+
 export default App;
